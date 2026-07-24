@@ -71,6 +71,7 @@ def main():
     print(f"Found {len(files)} files. Processing...\n")
     good, rejected = [], []
 
+    total_dur = 0.0
     for i, fpath in enumerate(files):
         fname = os.path.basename(fpath)
         out_name = f"clip{i+1}.wav"
@@ -86,6 +87,7 @@ def main():
                 os.remove(out_path)
             else:
                 good.append(out_name)
+                total_dur += dur
                 print(f"  ✅ {fname} → {out_name} ({dur:.1f}s)")
         except Exception as e:
             rejected.append((fname, str(e)))
@@ -95,7 +97,7 @@ def main():
     print(f"✅ Good: {len(good)}  |  ❌ Rejected: {len(rejected)}")
     for name, reason in rejected:
         print(f"   {name}: {reason}")
-    print(f"\n📊 ~{len(good)*10//60} min total. {'✅ Enough!' if len(good)>=80 else '⚠️ Record more.'}")
+    print(f"\n📊 Total Duration: {total_dur:.2f}s ({total_dur/60:.2f} min / {int(total_dur//60)}m {total_dur%60:.1f}s). {'✅ Enough clips!' if len(good)>=80 else '⚠️ Record more clips.'}")
 
     with open(os.path.join(args.output_dir, "clip_list.txt"), "w") as f:
         f.write("\n".join(good))
