@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# Audacity temporary wal/shm files
+*.aup3-shm
+*.aup3-wal
+
+# OS files
+.DS_Store
