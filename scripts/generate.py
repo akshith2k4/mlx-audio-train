@@ -35,9 +35,22 @@ def main():
         from mlx_audio.tts import load_model, generate
         import soundfile as sf
 
-        model = load_model(args.model)
+        model_path = args.model
+        if not os.path.exists(os.path.join(model_path, "config.json")):
+            model_path = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
 
-        audio = generate(
+        model = load_model(model_path)
+
+        # Apply trained weights if available
+        weights_path = os.path.join(args.model, "weights.npz")
+        if os.path.exists(weights_path):
+            import mlx.core as mx
+            from mlx.utils import tree_unflatten
+            loaded = dict(np.load(weights_path, allow_pickle=True))
+            model.update(tree_unflatten([(k, mx.array(v)) for k, v in loaded.items()]))
+            print("   Applied fine-tuned speaker weights!")
+
+        audio_result = generate(
             model,
             text=args.text,
             ref_audio=args.ref_audio if os.path.exists(args.ref_audio) else None,
@@ -45,12 +58,24 @@ def main():
             max_tokens=args.max_tokens,
         )
 
-        if isinstance(audio, np.ndarray):
-            sf.write(args.output, audio, 24000)
-        else:
-            sf.write(args.output, np.array(audio), 24000)
+        audio_chunks = []
+        if hasattr(audio_result, "__iter__") and not isinstance(audio_result, (np.ndarray, list)):
+            for chunk in audio_result:
+                if hasattr(chunk, "audio"):
+                    audio_chunks.append(np.array(chunk.audio, dtype=np.float32))
+                elif isinstance(chunk, (np.ndarray, list)):
+                    audio_chunks.append(np.array(chunk, dtype=np.float32))
+        elif isinstance(audio_result, (np.ndarray, list)):
+            audio_chunks.append(np.array(audio_result, dtype=np.float32))
+        elif hasattr(audio_result, "audio"):
+            audio_chunks.append(np.array(audio_result.audio, dtype=np.float32))
 
-        print(f"\n✅ Saved: {args.output}")
+        if audio_chunks:
+            final_audio = np.concatenate(audio_chunks)
+            sf.write(args.output, final_audio, 24000)
+            print(f"\n✅ Saved generated speech to: {args.output} ({len(final_audio)/24000:.2f}s)")
+        else:
+            print(f"\n⚠️  No audio samples generated.")
         return
 
     except ImportError:
